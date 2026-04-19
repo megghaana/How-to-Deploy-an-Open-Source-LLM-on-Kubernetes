@@ -3,22 +3,29 @@
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ```
-k8s-llm-stack/
-├── ollama-deployment.yaml    # Ollama LLM + model pull job
-├── monitoring.yaml           # Prometheus + Grafana
-├── chatbot-deployment.yaml   # Chatbot UI on k8s
+DrDoid-llm /
 ├── chatbot-ui/
-│   └── index.html            # Polished chat interface
-└── compare/
-    └── compare_models.py     # Mistral vs Claude analysis script
+│   └── index2.html          
+├── .github/
+│   └── workflows/
+│       └── ci.yml           
+├── .gitignore
+├── compare_models.py
+├── Dockerfile
+├── monitoring-fixed.yaml
+├── monitoring.yaml
+├── ollama-deployment.yaml
+├── server.js
+└── README.md
+
 ```
 
 ---
 
-## 🚀 Step-by-Step Setup
+## Step-by-Step Setup
 
 ### Prerequisites
 - Docker Desktop (with Kubernetes enabled) **OR** minikube installed
@@ -140,21 +147,7 @@ You should now see CPU, memory, pod health, and network metrics.
 
 ---
 
-## 🎥 Recording Tips (for your video)
-
-1. Record in this order:
-   - Show `kubectl get nodes` (cluster is live)
-   - `kubectl apply -f ollama-deployment.yaml` (deploy)
-   - Watch pods come up with `kubectl get pods -w`
-   - Show Grafana dashboard
-   - Open chatbot, ask the 4 suggested questions
-   - Show comparison script running
-2. Use Loom or OBS for recording
-3. Edit with veed.io — add captions, zoom in on terminal text
-
----
-
-## 🐛 Troubleshooting
+## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
@@ -165,17 +158,4 @@ You should now see CPU, memory, pod health, and network metrics.
 
 ---
 
-## 💡 Blog Outline
 
-```
-Title: How to Deploy an Open Source LLM Reliably on Kubernetes
-
-1. Introduction — why self-host an LLM?
-2. Architecture overview (Ollama + K8s + Grafana diagram)
-3. Setting up the cluster
-4. Deploying Mistral 7B with Ollama
-5. Monitoring with Prometheus + Grafana
-6. Building the chatbot UI
-7. Comparative analysis: Mistral vs Claude (cost, speed, quality)
-8. Conclusion + next steps (autoscaling, GPU nodes, ingress)
-```
