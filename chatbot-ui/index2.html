@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Oracle — Mistral 7B</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Caveat:wght@500;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:        #2d2416;
+  --ink2:       #5c4a2a;
+  --parchment:  #fdf6e8;
+  --cream:      #f7edcf;
+  --warm:       #ede0c0;
+  --border:     #d4ba8a;
+  --border2:    #c4a46a;
+  --moss:       #5a7a4a;
+  --moss2:      #3d5533;
+  --rose:       #c4627a;
+  --rose2:      #8f3a50;
+  --gold:       #c4922a;
+  --gold2:      #8f6515;
+  --sky:        #5a8aaa;
+  --lavender:   #8a7aaa;
+  --font-serif: 'Lora', Georgia, serif;
+  --font-hand:  'Caveat', cursive;
+  --font-body:  'DM Sans', sans-serif;
+}
+
+body {
+  background: var(--parchment);
+  color: var(--ink);
+  font-family: var(--font-body);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+body::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(ellipse at 15% 10%, rgba(196,146,42,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, rgba(90,122,74,0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 55% 40%, rgba(138,122,170,0.05) 0%, transparent 40%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(196,146,42,0.04) 27px, rgba(196,146,42,0.04) 28px);
+  pointer-events: none; z-index: 0;
+}
+#particles { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+
+/* ── Header ── */
+header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 62px;
+  background: linear-gradient(180deg, #f0e4c0 0%, #ede0c0 100%);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 2px 8px rgba(45,36,22,0.08);
+  flex-shrink: 0;
+}
+header::after {
+  content: '✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦';
+  position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: var(--border2); letter-spacing: 4px; white-space: nowrap;
+  background: var(--parchment); padding: 0 12px; pointer-events: none;
+}
+.logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-hand); font-size: 22px; font-weight: 700; color: var(--ink); }
+.logo-orb {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #c4922a, #c4627a, #8a7aaa, #5a7a4a, #c4922a);
+  animation: spin 8s linear infinite; position: relative; flex-shrink: 0;
+}
+.logo-orb::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--cream); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.model-tag { font-family: var(--font-hand); font-size: 15px; color: var(--moss2); background: rgba(90,122,74,0.12); border: 1.5px solid var(--moss); padding: 3px 12px; border-radius: 20px; transform: rotate(-1deg); }
+.status-area { display: flex; align-items: center; gap: 7px; font-family: var(--font-hand); font-size: 14px; color: var(--ink2); }
+.status-leaf { animation: sway 3s ease-in-out infinite; display: inline-block; }
+@keyframes sway { 0%,100%{transform:rotate(-10deg)} 50%{transform:rotate(10deg)} }
+
+/* ── Tab bar ── */
+.tab-bar {
+  position: relative; z-index: 9;
+  display: flex; gap: 0;
+  background: var(--warm);
+  border-bottom: 1.5px solid var(--border);
+  padding: 0 28px;
+  flex-shrink: 0;
+}
+.tab-btn {
+  font-family: var(--font-hand); font-size: 16px; color: var(--ink2);
+  background: none; border: none; cursor: pointer;
+  padding: 8px 20px 7px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.18s;
+  margin-bottom: -1.5px;
+}
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { color: var(--gold2); border-bottom-color: var(--gold); font-weight: 700; }
+
+/* ── Views ── */
+.view { display: none; flex: 1; overflow: hidden; flex-direction: column; position: relative; z-index: 5; }
+.view.active { display: flex; }
+
+/* ── Chat view ── */
+#chatView { overflow: hidden; }
+main {
+  flex: 1; overflow-y: auto; padding: 32px 0 16px; scroll-behavior: smooth;
+}
+main::-webkit-scrollbar { width: 6px; }
+main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.messages { max-width: 760px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Welcome */
+.welcome { text-align: center; padding: 24px 20px 32px; max-width: 560px; margin: 0 auto; }
+.welcome-orb { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px; background: conic-gradient(from 0deg, #c4922a, #c4627a, #8a7aaa, #5a7a4a, #5a8aaa, #c4922a); animation: spin 12s linear infinite; position: relative; }
+.welcome-orb-inner { position: absolute; inset: 8px; border-radius: 50%; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 28px; line-height: 1; }
+.welcome h1 { font-family: var(--font-hand); font-size: 42px; font-weight: 700; color: var(--ink); margin-bottom: 10px; line-height: 1.1; }
+.welcome h1 em { color: var(--rose); font-style: normal; }
+.welcome p { font-family: var(--font-serif); font-style: italic; color: var(--ink2); font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
+.suggestion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.suggestion-btn { background: var(--cream); border: 1.5px solid var(--border); border-radius: 14px; padding: 13px 15px; cursor: pointer; text-align: left; transition: all 0.2s; }
+.suggestion-btn:hover { border-color: var(--gold); transform: translateY(-2px) rotate(0.3deg); box-shadow: 0 4px 12px rgba(196,146,42,0.15); }
+.suggestion-btn strong { display: block; font-family: var(--font-hand); font-size: 15px; color: var(--ink); margin-bottom: 3px; }
+.suggestion-btn span { font-family: var(--font-body); font-size: 12px; color: var(--ink2); line-height: 1.4; }
+
+/* Messages */
+.msg { display: flex; gap: 12px; padding: 14px 16px; border-radius: 18px; animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes popIn { from{opacity:0;transform:scale(0.92) translateY(8px)} to{opacity:1;transform:none} }
+.msg.user { background: #f0e8d0; border: 1.5px solid var(--border); flex-direction: row-reverse; border-bottom-right-radius: 4px; }
+.msg.assistant { background: var(--parchment); border: 1.5px solid rgba(90,122,74,0.3); border-bottom-left-radius: 4px; box-shadow: 2px 2px 0px rgba(90,122,74,0.1); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; border: 2px solid var(--border); }
+.avatar.user-av { background: var(--rose); color: #fff; border-color: var(--rose2); font-family: var(--font-body); font-size: 11px; font-weight: 500; }
+.avatar.ai-av { background: var(--cream); animation: wiggle 6s ease-in-out infinite; }
+@keyframes wiggle { 0%,90%,100%{transform:rotate(0)} 92%{transform:rotate(-8deg)} 96%{transform:rotate(8deg)} }
+.bubble { flex: 1; min-width: 0; }
+.bubble-role { font-family: var(--font-hand); font-size: 13px; margin-bottom: 4px; }
+.msg.user .bubble-role { text-align: right; color: var(--rose2); }
+.msg.assistant .bubble-role { color: var(--moss2); }
+.bubble-text { font-family: var(--font-serif); font-size: 14.5px; line-height: 1.75; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.bubble-text code { font-family: 'Courier New', monospace; background: rgba(196,146,42,0.12); border: 1px solid rgba(196,146,42,0.25); padding: 2px 7px; border-radius: 5px; font-size: 12.5px; color: var(--gold2); }
+.typing-dots { display: flex; gap: 5px; align-items: center; height: 22px; padding: 4px 0; }
+.typing-dots span { width: 8px; height: 8px; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite; }
+.typing-dots span:nth-child(1) { background: var(--gold); animation-delay: 0s; }
+.typing-dots span:nth-child(2) { background: var(--rose); animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { background: var(--lavender); animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0) scale(1)} 30%{transform:translateY(-8px) scale(1.1)} }
+.error-msg { background: rgba(196,98,122,0.07); border: 1.5px solid rgba(196,98,122,0.3); border-radius: 14px; padding: 12px 16px; font-family: var(--font-hand); font-size: 14px; color: var(--rose2); }
+.banner { border-radius: 12px; padding: 8px 16px; font-family: var(--font-hand); font-size: 14px; max-width: 760px; margin: 0 auto 10px; }
+.banner.warn { background: rgba(196,146,42,0.1); border: 1.5px solid rgba(196,146,42,0.3); color: var(--gold2); }
+.banner.info { background: rgba(90,122,74,0.08); border: 1.5px solid rgba(90,122,74,0.25); color: var(--moss2); }
+
+/* Footer */
+footer { position: relative; z-index: 10; flex-shrink: 0; padding: 16px 24px 20px; background: linear-gradient(0deg, #ede0c0, #f0e4c0); border-top: 2px solid var(--border); }
+footer::before { content: '· · · · · · · · · · · · · · · · · · · · · · · · · · · · ·'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--border2); letter-spacing: 3px; background: var(--parchment); padding: 0 10px; white-space: nowrap; overflow: hidden; max-width: 90%; }
+.input-row { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+textarea { flex: 1; background: var(--parchment); border: 2px solid var(--border); border-radius: 16px; color: var(--ink); font-family: var(--font-serif); font-size: 14.5px; padding: 12px 16px; resize: none; min-height: 50px; max-height: 160px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.5; }
+textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,146,42,0.12); }
+textarea::placeholder { color: var(--border2); font-style: italic; }
+.send-btn { width: 50px; height: 50px; border-radius: 50%; background: var(--ink); border: 2px solid var(--ink2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+.send-btn:hover { transform: scale(1.08) rotate(5deg); background: var(--gold2); border-color: var(--gold); }
+.send-btn:active { transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.send-btn svg { width: 20px; height: 20px; fill: white; }
+.footer-note { max-width: 760px; margin: 8px auto 0; font-family: var(--font-hand); font-size: 13px; color: var(--ink2); text-align: center; opacity: 0.7; }
+
+/* ── Comparison view ── */
+#cmpView { overflow-y: auto; padding: 32px 24px 40px; }
+#cmpView::-webkit-scrollbar { width: 6px; }
+#cmpView::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.cmp-inner { max-width: 900px; margin: 0 auto; }
+
+.cmp-header { text-align: center; margin-bottom: 28px; }
+.cmp-header h2 { font-family: var(--font-hand); font-size: 34px; color: var(--ink); margin-bottom: 6px; }
+.cmp-header p { font-family: var(--font-serif); font-style: italic; color: var(--ink2); font-size: 14px; }
+
+.cmp-setup {
+  background: var(--cream); border: 1.5px solid var(--border); border-radius: 16px;
+  padding: 20px 24px; margin-bottom: 24px;
+}
+.cmp-setup-title { font-family: var(--font-hand); font-size: 18px; color: var(--ink); margin-bottom: 14px; }
+.cmp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.cmp-field label { display: block; font-family: var(--font-hand); font-size: 14px; color: var(--ink2); margin-bottom: 5px; }
+.cmp-field input, .cmp-field select {
+  width: 100%; background: var(--parchment); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 9px 13px; font-family: var(--font-body); font-size: 13px;
+  color: var(--ink); outline: none; transition: border-color 0.2s;
+}
+.cmp-field input:focus, .cmp-field select:focus { border-color: var(--gold); }
+.cmp-field input::placeholder { color: var(--border2); }
+.cmp-note { font-size: 11.5px; color: var(--ink2); margin-top: 4px; font-family: var(--font-body); }
+
+.run-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--ink); color: #fff; border: none; border-radius: 12px;
+  padding: 11px 24px; font-family: var(--font-hand); font-size: 17px;
+  cursor: pointer; transition: all 0.2s;
+}
+.run-btn:hover { background: var(--gold2); transform: translateY(-1px); }
+.run-btn:active { transform: scale(0.97); }
+.run-btn:disabled { background: var(--border2); cursor: not-allowed; transform: none; }
+
+/* Progress bar */
+.progress-wrap { margin-bottom: 20px; display: none; }
+.progress-label { font-family: var(--font-hand); font-size: 14px; color: var(--ink2); margin-bottom: 6px; }
+.progress-bar-bg { background: var(--warm); border-radius: 8px; height: 10px; overflow: hidden; border: 1px solid var(--border); }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--rose)); border-radius: 8px; transition: width 0.4s ease; width: 0%; }
+
+/* Summary cards */
+.summary-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+.scard {
+  background: var(--cream); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 16px 18px;
+}
+.scard-title { font-family: var(--font-hand); font-size: 18px; margin-bottom: 12px; }
+.scard-title.mistral { color: var(--moss2); }
+.scard-title.claude  { color: var(--sky); }
+.scard-metric { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+.scard-metric:last-child { border-bottom: none; }
+.scard-metric-label { color: var(--ink2); font-family: var(--font-body); }
+.scard-metric-val { font-family: var(--font-hand); font-size: 16px; color: var(--ink); }
+.scard-metric-val.win { color: var(--moss2); font-size: 18px; }
+
+/* Results table */
+.results-title { font-family: var(--font-hand); font-size: 22px; color: var(--ink); margin-bottom: 14px; }
+.results-table-wrap { overflow-x: auto; border-radius: 14px; border: 1.5px solid var(--border); margin-bottom: 28px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead tr { background: var(--warm); }
+th { font-family: var(--font-hand); font-size: 14px; font-weight: 700; color: var(--ink2); padding: 10px 14px; text-align: left; border-bottom: 1.5px solid var(--border); white-space: nowrap; }
+td { padding: 10px 14px; border-bottom: 1px dashed rgba(212,186,138,0.5); vertical-align: top; color: var(--ink); font-family: var(--font-body); }
+tr:last-child td { border-bottom: none; }
+tr:nth-child(even) td { background: rgba(247,237,207,0.4); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-family: var(--font-hand); font-weight: 700; white-space: nowrap; }
+.badge.win-m  { background: rgba(90,122,74,0.15);  color: var(--moss2); }
+.badge.win-c  { background: rgba(90,138,170,0.15); color: #2e6080; }
+.badge.tie    { background: rgba(196,146,42,0.15); color: var(--gold2); }
+.latency-bar { display: flex; align-items: center; gap: 6px; }
+.lbar { height: 6px; border-radius: 3px; min-width: 2px; }
+.lbar.m { background: var(--moss); }
+.lbar.c { background: var(--sky); }
+
+/* Expandable row detail */
+.detail-row td { background: rgba(253,246,232,0.8) !important; padding: 0; }
+.detail-box { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.detail-col h4 { font-family: var(--font-hand); font-size: 14px; margin-bottom: 6px; }
+.detail-col h4.mistral { color: var(--moss2); }
+.detail-col h4.claude  { color: var(--sky); }
+.detail-col p { font-family: var(--font-serif); font-size: 12.5px; line-height: 1.6; color: var(--ink); font-style: italic; }
+.expand-btn { background: none; border: none; cursor: pointer; font-size: 11px; font-family: var(--font-hand); color: var(--gold2); text-decoration: underline; padding: 0; margin-top: 4px; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--ink2); font-family: var(--font-serif); font-style: italic; }
+.empty-state .big { font-size: 36px; display: block; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<header>
+  <div class="logo"><div class="logo-orb"></div>The Oracle</div>
+  <div class="model-tag">mistral:7b</div>
+  <div class="status-area">
+    <span class="status-leaf" id="statusLeaf">🌿</span>
+    <span id="statusText">awakening...</span>
+  </div>
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('chat', this)">🔮 Chat</button>
+  <button class="tab-btn" onclick="switchTab('cmp', this)">⚗️ Comparison</button>
+</div>
+
+<!-- ══ CHAT VIEW ══════════════════════════════════════ -->
+<div class="view active" id="chatView" style="flex-direction:column;">
+  <main id="main">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-orb"><div class="welcome-orb-inner">✦</div></div>
+        <h1>Ask the <em>Oracle</em></h1>
+        <p>An open-source mind, running quietly on your own machines.<br/>What mysteries shall we explore today?</p>
+        <div class="suggestion-grid">
+          <button class="suggestion-btn" onclick="sendSuggestion('Which model are you and who made you?')">
+            <strong>🪬 Identity</strong><span>Which model are you and who made you?</span>
+          </button>
+          <button class="suggestion-btn" onclick="sendSuggestion('What is your knowledge cutoff date?')">
+            <strong>📜 Knowledge</strong><span>What is your knowledge cutoff date?</span>
+          </button>
+          <button class="suggestion-btn" onclick="sendSuggestion('What can you help me with? List your capabilities.')">
+            <strong>✨ Capabilities</strong><span>What can you help me with?</span>
+          </button>
+          <button class="suggestion-btn" onclick="sendSuggestion('Explain how Kubernetes works in simple terms.')">
+            <strong>🏗️ Kubernetes</strong><span>Explain Kubernetes simply.</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="banner warn" id="offlineBanner" style="display:none">
+      ✦ The oracle sleeps — cannot reach <span id="ollamaUrlDisplay"></span>
+    </div>
+    <div class="banner info" id="proxyBanner" style="display:none">
+      ✦ Channeling through cloud relay → Ollama
+    </div>
+    <div class="input-row">
+      <textarea id="inputBox" placeholder="Speak your question into the void..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div class="footer-note" id="footerNote">✦ Mistral 7B · running on Kubernetes · your data stays yours ✦</div>
+  </footer>
+</div>
+
+<!-- ══ COMPARISON VIEW ════════════════════════════════ -->
+<div class="view" id="cmpView">
+  <div class="cmp-inner">
+    <div class="cmp-header">
+      <h2>⚗️ The Grand Duel</h2>
+      <p>Mistral 7B (your Kubernetes cluster) vs OpenAI GPT (API) — 10 prompts, head to head</p>
+    </div>
+
+    <div class="cmp-setup">
+      <div class="cmp-setup-title">✦ Setup the experiment</div>
+      <div class="cmp-fields">
+        <div class="cmp-field">
+          <label>OpenAI API Key</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-..." />
+          <div class="cmp-note">Used only in your browser. Never sent anywhere except api.openai.com.</div>
+        </div>
+        <div class="cmp-field">
+          <label>Commercial model</label>
+          <select id="commercialModel">
+            <option value="gpt-4o-mini">GPT-4o mini (fastest, cheapest)</option>
+            <option value="gpt-4o">GPT-4o (smarter)</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (legacy)</option>
+          </select>
+          <div class="cmp-note">4o-mini ≈ $0.001 for all 10 prompts. 4o ≈ $0.05.</div>
+        </div>
+      </div>
+      <button class="run-btn" id="runBtn" onclick="runComparison()">
+        <span>✦</span> Run the duel
+      </button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label" id="progressLabel">Consulting the oracle... (0/10)</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    </div>
+
+    <!-- Summary cards (hidden until run) -->
+    <div class="summary-cards" id="summaryCards" style="display:none">
+      <div class="scard">
+        <div class="scard-title mistral">🌿 Mistral 7B</div>
+        <div class="scard-metric"><span class="scard-metric-label">Avg latency</span><span class="scard-metric-val" id="sm-lat">—</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Avg quality</span><span class="scard-metric-val" id="sm-qual">—</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Total cost</span><span class="scard-metric-val" id="sm-cost">$0.00</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Prompts won</span><span class="scard-metric-val" id="sm-wins">—</span></div>
+      </div>
+      <div class="scard">
+        <div class="scard-title claude">🌊 OpenAI GPT</div>
+        <div class="scard-metric"><span class="scard-metric-label">Avg latency</span><span class="scard-metric-val" id="sc-lat">—</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Avg quality</span><span class="scard-metric-val" id="sc-qual">—</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Total cost</span><span class="scard-metric-val" id="sc-cost">—</span></div>
+        <div class="scard-metric"><span class="scard-metric-label">Prompts won</span><span class="scard-metric-val" id="sc-wins">—</span></div>
+      </div>
+    </div>
+
+    <div id="resultsSection">
+      <div class="empty-state">
+        <span class="big">⚗️</span>
+        Enter your OpenAI API key above and click <em>Run the duel</em> to begin.<br/>
+        Mistral runs on your local Kubernetes cluster. GPT runs via the OpenAI API.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Particles ── */
+(function() {
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  let W, H, pts;
+  const COLORS = ['#c4922a','#c4627a','#8a7aaa','#5a7a4a','#5a8aaa'];
+  const GLYPHS = ['✦','✧','·','◦','∘','⊹','✿','❧'];
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  function mk() { return { x: Math.random()*W, y: Math.random()*H, vx: (Math.random()-.5)*.3, vy: -Math.random()*.35-.08, size: Math.random()*10+8, color: COLORS[Math.floor(Math.random()*COLORS.length)], glyph: GLYPHS[Math.floor(Math.random()*GLYPHS.length)], alpha: Math.random()*.22+.05, w: Math.random()*Math.PI*2, ws: (Math.random()-.5)*.02 }; }
+  resize(); pts = Array.from({length:38}, mk); window.addEventListener('resize', resize);
+  (function frame() { ctx.clearRect(0,0,W,H); pts.forEach(p=>{ p.w+=p.ws; p.x+=p.vx+Math.sin(p.w)*.18; p.y+=p.vy; if(p.y<-20){p.y=H+10;p.x=Math.random()*W;} ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color; ctx.font=p.size+'px serif'; ctx.fillText(p.glyph,p.x,p.y); ctx.restore(); }); requestAnimationFrame(frame); })();
+})();
+
+/* ── URL resolution ── */
+function resolveOllamaConfig() {
+  const p = new URLSearchParams(window.location.search).get('ollama');
+  if (p) return { url: p, mode: 'direct' };
+  const cloud = window.location.hostname.includes('run.app') || window.location.hostname.includes('cloudrun');
+  return cloud ? { url: window.location.origin, mode: 'proxy' } : { url: 'http://localhost:11434', mode: 'direct' };
+}
+const { url: BACKEND, mode: MODE } = resolveOllamaConfig();
+const MODEL = 'mistral:7b';
+document.getElementById('ollamaUrlDisplay').textContent = BACKEND;
+document.getElementById('footerNote').textContent = MODE === 'proxy' ? '✦ Cloud Run → ngrok → Ollama on Kubernetes ✦' : '✦ Mistral 7B · running on Kubernetes · your data stays yours ✦';
+if (MODE === 'proxy') document.getElementById('proxyBanner').style.display = 'block';
+
+/* ── Status ── */
+async function checkOllama() {
+  try {
+    const r = await fetch(MODE==='proxy' ? `${BACKEND}/api/health` : `${BACKEND}/api/tags`, { signal: AbortSignal.timeout(4000) });
+    if (r.ok) { document.getElementById('statusLeaf').textContent='🌿'; document.getElementById('statusText').textContent='oracle is ready'; document.getElementById('offlineBanner').style.display='none'; }
+    else throw 0;
+  } catch { document.getElementById('statusLeaf').textContent='🍂'; document.getElementById('statusText').textContent='oracle sleeps'; document.getElementById('offlineBanner').style.display='block'; }
+}
+checkOllama(); setInterval(checkOllama, 15000);
+
+/* ── Tab switching ── */
+function switchTab(tab, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tab === 'chat' ? 'chatView' : 'cmpView').classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Chat ── */
+let history = [], streaming = false;
+const inputBox = document.getElementById('inputBox');
+const sendBtn  = document.getElementById('sendBtn');
+inputBox.addEventListener('input', () => { inputBox.style.height='auto'; inputBox.style.height=Math.min(inputBox.scrollHeight,160)+'px'; });
+inputBox.addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} });
+sendBtn.addEventListener('click', send);
+function sendSuggestion(t) { inputBox.value=t; send(); }
+const AI_EMOJIS = ['🔮','✨','🌙','⚗️','🪄','🌌','🍄','🦉'];
+
+async function send() {
+  const text = inputBox.value.trim();
+  if (!text || streaming) return;
+  const w = document.getElementById('welcome');
+  if (w) w.style.display = 'none';
+  streaming = true; sendBtn.disabled = true;
+  inputBox.value = ''; inputBox.style.height = 'auto';
+  history.push({ role:'user', content:text });
+  appendMsg('user', text);
+  const aiEl = appendMsg('assistant', null);
+  try {
+    const res = await fetch(`${BACKEND}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:MODEL, messages:history, stream:true}) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body.getReader(); const dec = new TextDecoder();
+    let full = '';
+    const bubble = aiEl.querySelector('.bubble-text'); bubble.innerHTML = '';
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      for (const line of dec.decode(value,{stream:true}).split('\n')) {
+        if (!line.trim()) continue;
+        try { const j=JSON.parse(line); if(j.message?.content){full+=j.message.content; bubble.textContent=full; scrollBot();} } catch {}
+      }
+    }
+    history.push({ role:'assistant', content:full });
+  } catch(err) {
+    const e = document.createElement('div'); e.className='error-msg';
+    e.textContent = '✦ The oracle cannot speak: '+err.message; aiEl.replaceWith(e);
+  }
+  streaming = false; sendBtn.disabled = false; inputBox.focus();
+}
+
+function appendMsg(role, text) {
+  const div = document.createElement('div'); div.className='msg '+role;
+  const isUser = role==='user';
+  const emoji  = AI_EMOJIS[Math.floor(Math.random()*AI_EMOJIS.length)];
+  div.innerHTML = `<div class="avatar ${isUser?'user-av':'ai-av'}">${isUser?'you':emoji}</div><div class="bubble"><div class="bubble-role">${isUser?'wanderer':'the oracle'}</div><div class="bubble-text">${text!==null?esc(text):'<div class="typing-dots"><span></span><span></span><span></span></div>'}</div></div>`;
+  document.getElementById('messages').appendChild(div); scrollBot(); return div;
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function scrollBot() { document.getElementById('main').scrollTo({top:999999,behavior:'smooth'}); }
+
+/* ══════════════════════════════════════════════════
+   COMPARISON ENGINE
+══════════════════════════════════════════════════ */
+const PROMPTS = [
+  { id:1,  label:'Model identity',      text:'Which model are you and who created you?' },
+  { id:2,  label:'Knowledge cutoff',    text:'What is your knowledge cutoff date and what are the most recent events you know about?' },
+  { id:3,  label:'Transformers',        text:'Explain how transformer neural networks work in 3 sentences.' },
+  { id:4,  label:'Reverse linked list', text:'Write a Python function to reverse a singly linked list.' },
+  { id:5,  label:'Capital facts',       text:'What is the capital of Australia? Give 3 interesting facts about it.' },
+  { id:6,  label:'WWI causes',          text:'Summarise the main causes of World War I in under 100 words.' },
+  { id:7,  label:'K8s vs Compose',      text:'What are the pros and cons of Kubernetes versus Docker Compose?' },
+  { id:8,  label:'Haiku',               text:'Write a haiku about machine learning and uncertainty.' },
+  { id:9,  label:'Mental math',         text:'What is 17 multiplied by 23? Show your working step by step.' },
+  { id:10, label:'CAP theorem',         text:'Explain the CAP theorem to a junior developer in simple terms.' },
+];
+
+let cmpResults = [];
+
+function scoreResponse(text) {
+  if (!text || text.startsWith('ERROR')) return 0;
+  let s = 5;
+  if (text.length > 200) s++;
+  if (text.length > 500) s++;
+  if (/because|therefore|however|for example|firstly/i.test(text)) s++;
+  if (text.length < 40) s -= 2;
+  return Math.max(0, Math.min(10, s));
+}
+
+async function queryOllama(prompt) {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${BACKEND}/api/chat`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: MODEL, messages:[{role:'user', content:prompt}], stream:false }),
+      signal: AbortSignal.timeout(90000)
+    });
+    const data = await res.json();
+    return { text: data.message?.content || 'No response', latency: (Date.now()-t0)/1000, cost: 0 };
+  } catch(e) { return { text: 'ERROR: '+e.message, latency: 0, cost: 0 }; }
+}
+
+async function queryOpenAI(prompt, apiKey, model) {
+  const t0 = Date.now();
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model, max_tokens:1024, messages:[{role:'user',content:prompt}] }),
+      signal: AbortSignal.timeout(30000)
+    });
+    if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||res.status); }
+    const data = await res.json();
+    const inp = data.usage?.prompt_tokens||0, out = data.usage?.completion_tokens||0;
+    // Pricing per 1M tokens (as of 2025)
+    const costPer1M = model === 'gpt-4o'          ? {in:5.0,  out:15.0}
+                    : model === 'gpt-4o-mini'      ? {in:0.15, out:0.60}
+                    :                                {in:0.50, out:1.50}; // gpt-3.5-turbo
+    const cost = (inp*costPer1M.in + out*costPer1M.out) / 1_000_000;
+    return { text: data.choices?.[0]?.message?.content || 'No response', latency: (Date.now()-t0)/1000, cost };
+  } catch(e) { return { text: 'ERROR: '+e.message, latency: 0, cost: 0 }; }
+}
+
+async function runComparison() {
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  const model  = document.getElementById('commercialModel').value;
+  if (!apiKey) { alert('Please enter your OpenAI API key to run the comparison.'); return; }
+
+  cmpResults = [];
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('summaryCards').style.display = 'none';
+  document.getElementById('resultsSection').innerHTML = '';
+
+  const pw = document.getElementById('progressWrap');
+  const pf = document.getElementById('progressFill');
+  const pl = document.getElementById('progressLabel');
+  pw.style.display = 'block'; pf.style.width = '0%';
+
+  for (let i = 0; i < PROMPTS.length; i++) {
+    const p = PROMPTS[i];
+    pl.textContent = `✦ Asking both oracles: "${p.label}" (${i+1}/${PROMPTS.length})`;
+    pf.style.width = (i / PROMPTS.length * 100) + '%';
+
+    const [m, c] = await Promise.all([
+      queryOllama(p.text),
+      queryOpenAI(p.text, apiKey, model)
+    ]);
+
+    cmpResults.push({
+      ...p,
+      mistral: { ...m, score: scoreResponse(m.text) },
+      claude:  { ...c, score: scoreResponse(c.text) },
+    });
+  }
+
+  pf.style.width = '100%';
+  pl.textContent = '✦ The duel is complete!';
+  setTimeout(() => { pw.style.display = 'none'; }, 1500);
+
+  renderResults(model);
+  document.getElementById('runBtn').disabled = false;
+}
+
+function renderResults(model) {
+  const modelLabel = model === 'gpt-4o' ? 'GPT-4o' : model === 'gpt-4o-mini' ? 'GPT-4o mini' : 'GPT-3.5 Turbo';
+
+  const avgLat = arr => (arr.reduce((a,r)=>a+r,0)/arr.length).toFixed(1)+'s';
+  const avgQual = arr => (arr.reduce((a,r)=>a+r,0)/arr.length).toFixed(1)+'/10';
+  const totalCost = arr => '$'+(arr.reduce((a,r)=>a+r,0)).toFixed(4);
+
+  const mLats  = cmpResults.map(r=>r.mistral.latency);
+  const cLats  = cmpResults.map(r=>r.claude.latency);
+  const mQuals = cmpResults.map(r=>r.mistral.score);
+  const cQuals = cmpResults.map(r=>r.claude.score);
+  const mCosts = cmpResults.map(r=>r.mistral.cost);
+  const cCosts = cmpResults.map(r=>r.claude.cost);
+
+  let mWins=0, cWins=0;
+  cmpResults.forEach(r => { if(r.mistral.score>r.claude.score) mWins++; else if(r.claude.score>r.mistral.score) cWins++; });
+
+  document.getElementById('sm-lat').textContent  = avgLat(mLats);
+  document.getElementById('sm-qual').textContent = avgQual(mQuals);
+  document.getElementById('sm-cost').textContent = '$0.00 (free!)';
+  document.getElementById('sm-wins').textContent = mWins+' / 10';
+  document.getElementById('sc-lat').textContent  = avgLat(cLats);
+  document.getElementById('sc-qual').textContent = avgQual(cQuals);
+  document.getElementById('sc-cost').textContent = totalCost(cCosts);
+  document.getElementById('sc-wins').textContent = cWins+' / 10';
+
+  const maxLat = Math.max(...mLats, ...cLats, 1);
+
+  document.getElementById('summaryCards').style.display = 'grid';
+
+  let rows = '';
+  cmpResults.forEach((r, idx) => {
+    const mWin = r.mistral.score > r.claude.score;
+    const cWin = r.claude.score  > r.mistral.score;
+    const mBadge = mWin ? '<span class="badge win-m">✦ wins</span>' : cWin ? '' : '<span class="badge tie">tie</span>';
+    const cBadge = cWin ? '<span class="badge win-c">✦ wins</span>' : mWin ? '' : '<span class="badge tie">tie</span>';
+    const mBarW  = Math.round(r.mistral.latency / maxLat * 80);
+    const cBarW  = Math.round(r.claude.latency  / maxLat * 80);
+
+    rows += `
+      <tr onclick="toggleDetail(${idx})" style="cursor:pointer">
+        <td style="font-family:var(--font-hand);font-size:15px;color:var(--ink2)">${r.id}</td>
+        <td style="max-width:180px">
+          <div style="font-family:var(--font-hand);font-size:14px;color:var(--ink)">${r.label}</div>
+          <div style="font-size:11px;color:var(--ink2);margin-top:2px">${r.text.slice(0,52)}…</div>
+          <button class="expand-btn">▾ see responses</button>
+        </td>
+        <td>
+          <div class="latency-bar"><div class="lbar m" style="width:${mBarW}px"></div><span style="font-size:12px;color:var(--moss2)">${r.mistral.latency.toFixed(1)}s</span></div>
+          <div class="latency-bar" style="margin-top:4px"><div class="lbar c" style="width:${cBarW}px"></div><span style="font-size:12px;color:var(--sky)">${r.claude.latency.toFixed(1)}s</span></div>
+        </td>
+        <td>
+          <div style="font-family:var(--font-hand);font-size:16px;color:var(--moss2)">${r.mistral.score}/10 ${mBadge}</div>
+          <div style="font-family:var(--font-hand);font-size:16px;color:var(--sky)">${r.claude.score}/10 ${cBadge}</div>
+        </td>
+        <td style="font-family:var(--font-hand);font-size:13px;color:var(--ink2)">
+          <div style="color:var(--moss2)">$0.00</div>
+          <div style="color:var(--sky)">$${r.claude.cost.toFixed(5)}</div>
+        </td>
+      </tr>
+      <tr class="detail-row" id="detail-${idx}" style="display:none">
+        <td colspan="5">
+          <div class="detail-box">
+            <div class="detail-col">
+              <h4 class="mistral">🌿 Mistral 7B</h4>
+              <p>${esc(r.mistral.text.slice(0,400))}${r.mistral.text.length>400?'…':''}</p>
+            </div>
+            <div class="detail-col">
+              <h4 class="claude">🌊 ${modelLabel}</h4>
+              <p>${esc(r.claude.text.slice(0,400))}${r.claude.text.length>400?'…':''}</p>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+  });
+
+  document.getElementById('resultsSection').innerHTML = `
+    <div class="results-title">✦ Prompt-by-prompt results <span style="font-size:14px;color:var(--ink2);font-family:var(--font-body)">(click any row to see responses)</span></div>
+    <div class="results-table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Prompt</th>
+          <th>Latency<br/><span style="font-size:11px;font-weight:400;color:var(--moss2)">🌿</span> <span style="font-size:11px;color:var(--sky)">🌊</span></th>
+          <th>Quality score</th><th>Cost</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function toggleDetail(idx) {
+  const row = document.getElementById('detail-'+idx);
+  row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LLM Chat — Mistral 7B</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0c0e11;
+    --surface:  #141720;
+    --border:   #252a35;
+    --muted:    #3a4155;
+    --text:     #e8ecf4;
+    --sub:      #8891a8;
+    --accent:   #4f9eff;
+    --accent2:  #00d4aa;
+    --user-bg:  #1a2035;
+    --ai-bg:    #111420;
+    --err:      #ff5f5f;
+    --font-ui:  'Syne', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent2);
+    box-shadow: 0 0 8px var(--accent2);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  .model-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(79,158,255,0.1);
+    border: 1px solid rgba(79,158,255,0.25);
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--sub);
+    font-family: var(--font-mono);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent2);
+  }
+  .status-dot.offline { background: var(--err); animation: none; }
+
+  /* ── main ── */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+    scroll-behavior: smooth;
+  }
+  main::-webkit-scrollbar { width: 4px; }
+  main::-webkit-scrollbar-track { background: transparent; }
+  main::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+  .messages { max-width: 780px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── welcome ── */
+  .welcome {
+    text-align: center;
+    padding: 60px 20px 40px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .welcome h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--text), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  .welcome p { color: var(--sub); font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+  .suggestion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+  .suggestion-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    color: var(--sub);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    transition: all 0.15s;
+    text-align: left;
+    line-height: 1.4;
+  }
+  .suggestion-btn:hover { border-color: var(--accent); color: var(--text); background: rgba(79,158,255,0.05); }
+  .suggestion-btn strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+
+  /* ── message bubbles ── */
+  .msg {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .msg.user { background: var(--user-bg); flex-direction: row-reverse; }
+  .msg.assistant { background: var(--ai-bg); }
+
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; flex-shrink: 0;
+    font-family: var(--font-mono);
+  }
+  .avatar.user-av { background: rgba(79,158,255,0.2); color: var(--accent); border: 1px solid rgba(79,158,255,0.3); }
+  .avatar.ai-av   { background: rgba(0,212,170,0.15); color: var(--accent2); border: 1px solid rgba(0,212,170,0.25); }
+
+  .bubble { flex: 1; min-width: 0; }
+  .bubble-role { font-size: 11px; color: var(--sub); font-family: var(--font-mono); margin-bottom: 5px; letter-spacing: 0.05em; }
+  .msg.user .bubble-role { text-align: right; }
+  .bubble-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble-text code {
+    font-family: var(--font-mono);
+    background: rgba(255,255,255,0.07);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+
+  /* typing indicator */
+  .typing-dots { display: flex; gap: 4px; align-items: center; height: 20px; }
+  .typing-dots span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--sub);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30%           { transform: translateY(-5px); }
+  }
+
+  /* error */
+  .error-msg {
+    background: rgba(255,95,95,0.08);
+    border: 1px solid rgba(255,95,95,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--err);
+    font-family: var(--font-mono);
+    margin: 4px 0;
+  }
+
+  /* ── footer ── */
+  footer {
+    flex-shrink: 0;
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .input-row {
+    max-width: 780px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .input-wrap { flex: 1; position: relative; }
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    padding: 12px 16px;
+    resize: none;
+    min-height: 48px;
+    max-height: 160px;
+    outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .send-btn {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #72b3ff; }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+  .send-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+  .footer-note { max-width: 780px; margin: 6px auto 0; font-size: 11px; color: var(--muted); font-family: var(--font-mono); text-align: center; }
+
+  /* config banner */
+  .config-banner {
+    background: rgba(255,200,0,0.07);
+    border: 1px solid rgba(255,200,0,0.2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #ffcc00;
+    font-family: var(--font-mono);
+    max-width: 780px;
+    margin: 0 auto 12px;
+  }
+  .config-banner a { color: #ffcc00; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    LLM PLAYGROUND
+  </div>
+  <div class="model-badge" id="modelBadge">mistral:7b</div>
+  <div class="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <h1>Mistral 7B</h1>
+      <p>Open-source LLM running locally on Kubernetes.<br/>Ask anything — no data leaves your cluster.</p>
+      <div class="suggestion-grid">
+        <button class="suggestion-btn" onclick="sendSuggestion('Which model are you and who made you?')">
+          <strong>Model identity</strong>Which model are you and who made you?
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('What is the latest information you have? What is your knowledge cutoff?')">
+          <strong>Knowledge cutoff</strong>What is your knowledge cutoff date?
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('What can you help me with? List your capabilities.')">
+          <strong>Capabilities</strong>What can you help me with?
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('Explain how you work at a high level.')">
+          <strong>How you work</strong>Explain how you work at a high level.
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="config-banner" id="configBanner" style="display:none">
+    ⚠ Ollama not reachable at <code id="ollamaUrlDisplay"></code>.
+    Make sure to run: <code>kubectl port-forward svc/ollama-service 11434:11434 -n llm-stack</code>
+  </div>
+  <div class="input-row">
+    <div class="input-wrap">
+      <textarea id="inputBox" placeholder="Message Mistral..." rows="1"></textarea>
+    </div>
+    <button class="send-btn" id="sendBtn" title="Send">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+  <div class="footer-note">Running on Kubernetes · Ollama · Mistral 7B · No data stored</div>
+</footer>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────
+// Update OLLAMA_URL if using a different port-forward or ingress
+const OLLAMA_URL = 'http://localhost:11434';
+const MODEL      = 'mistral:7b';
+// ────────────────────────────────────────────────────
+
+const messagesEl  = document.getElementById('messages');
+const inputBox    = document.getElementById('inputBox');
+const sendBtn     = document.getElementById('sendBtn');
+const statusDot   = document.getElementById('statusDot');
+const statusText  = document.getElementById('statusText');
+const banner      = document.getElementById('configBanner');
+const ollamaUrlEl = document.getElementById('ollamaUrlDisplay');
+const welcome     = document.getElementById('welcome');
+
+let conversationHistory = [];
+let isStreaming = false;
+
+// ── Health check ─────────────────────────────────────
+async function checkOllama() {
+  ollamaUrlEl.textContent = OLLAMA_URL;
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      const data = await res.json();
+      const models = data.models || [];
+      const found  = models.find(m => m.name.startsWith('mistral'));
+      statusDot.classList.remove('offline');
+      statusText.textContent = found ? 'online · mistral ready' : 'online · pulling model...';
+      banner.style.display = 'none';
+    } else { throw new Error('bad status'); }
+  } catch {
+    statusDot.classList.add('offline');
+    statusText.textContent = 'offline';
+    banner.style.display = 'block';
+  }
+}
+checkOllama();
+setInterval(checkOllama, 15000);
+
+// ── Auto-resize textarea ──────────────────────────────
+inputBox.addEventListener('input', () => {
+  inputBox.style.height = 'auto';
+  inputBox.style.height = Math.min(inputBox.scrollHeight, 160) + 'px';
+});
+
+inputBox.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+sendBtn.addEventListener('click', handleSend);
+
+// ── Suggestion shortcuts ──────────────────────────────
+function sendSuggestion(text) {
+  inputBox.value = text;
+  handleSend();
+}
+
+// ── Send ──────────────────────────────────────────────
+async function handleSend() {
+  const text = inputBox.value.trim();
+  if (!text || isStreaming) return;
+
+  if (welcome) welcome.style.display = 'none';
+
+  isStreaming = true;
+  sendBtn.disabled = true;
+  inputBox.value = '';
+  inputBox.style.height = 'auto';
+
+  conversationHistory.push({ role: 'user', content: text });
+
+  appendMessage('user', text);
+  const aiEl = appendMessage('assistant', null); // typing state
+
+  try {
+    const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: conversationHistory,
+        stream: true
+      })
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantText = '';
+    const bubble = aiEl.querySelector('.bubble-text');
+    bubble.innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines  = chunk.split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const json = JSON.parse(line);
+          if (json.message?.content) {
+            assistantText += json.message.content;
+            bubble.textContent = assistantText;
+            scrollToBottom();
+          }
+        } catch {}
+      }
+    }
+
+    conversationHistory.push({ role: 'assistant', content: assistantText });
+
+  } catch (err) {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'error-msg';
+    errDiv.textContent = `Error: ${err.message}. Is Ollama port-forwarded? Run: kubectl port-forward svc/ollama-service 11434:11434 -n llm-stack`;
+    aiEl.replaceWith(errDiv);
+  }
+
+  isStreaming = false;
+  sendBtn.disabled = false;
+  inputBox.focus();
+}
+
+// ── DOM helpers ───────────────────────────────────────
+function appendMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const isUser = role === 'user';
+  div.innerHTML = `
+    <div class="avatar ${isUser ? 'user-av' : 'ai-av'}">${isUser ? 'U' : 'AI'}</div>
+    <div class="bubble">
+      <div class="bubble-role">${isUser ? 'you' : MODEL}</div>
+      <div class="bubble-text">${text !== null ? escHtml(text) : typingDots()}</div>
+    </div>`;
+  messagesEl.appendChild(div);
+  scrollToBottom();
+  return div;
+}
+
+function typingDots() {
+  return '<div class="typing-dots"><span></span><span></span><span></span></div>';
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function scrollToBottom() {
+  document.getElementById('main').scrollTo({ top: 999999, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
