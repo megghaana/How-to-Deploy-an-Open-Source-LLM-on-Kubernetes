@@ -9,14 +9,19 @@ SETUP:
   kubectl port-forward svc/ollama-service 11434:11434 -n llm-stack
 """
 
-import os, time, json, requests
-from openai import OpenAI
-from tabulate import tabulate
+import json
+import os
+import time
 from datetime import datetime
 
-OLLAMA_URL   = "http://localhost:11434"
+import requests
+from openai import OpenAI
+from tabulate import tabulate
+
+
+OLLAMA_URL = "http://localhost:11434"
 OLLAMA_MODEL = "mistral:7b"
-OPENAI_MODEL = "gpt-4o-mini"   # cheapest option — change to "gpt-4o" for smarter
+OPENAI_MODEL = "gpt-4o-mini"  # cheapest option — change to "gpt-4o" for smarter
 
 PROMPTS = [
     "Which model are you and who created you?",
@@ -30,6 +35,7 @@ PROMPTS = [
     "What is 17 multiplied by 23? Show your working.",
     "Explain the CAP theorem in simple terms."
 ]
+
 
 def query_ollama(prompt: str) -> dict:
     start = time.time()
@@ -46,15 +52,16 @@ def query_ollama(prompt: str) -> dict:
         data = resp.json()
         latency = time.time() - start
         content = data.get("message", {}).get("content", "ERROR: no content")
-        tokens  = data.get("eval_count", 0)
+        tokens = data.get("eval_count", 0)
         return {
             "response": content,
             "latency_s": round(latency, 2),
             "tokens": tokens,
-            "cost_usd": 0.0   # free, running locally
+            "cost_usd": 0.0  # free, running locally
         }
     except Exception as e:
         return {"response": f"ERROR: {e}", "latency_s": 0, "tokens": 0, "cost_usd": 0.0}
+
 
 def query_openai(client: OpenAI, prompt: str) -> dict:
     start = time.time()
@@ -66,7 +73,7 @@ def query_openai(client: OpenAI, prompt: str) -> dict:
         )
         latency = time.time() - start
         content = msg.choices[0].message.content
-        input_tokens  = msg.usage.prompt_tokens
+        input_tokens = msg.usage.prompt_tokens
         output_tokens = msg.usage.completion_tokens
         # gpt-4o-mini pricing: $0.15/M input, $0.60/M output (as of 2025)
         # gpt-4o pricing:      $5.00/M input, $15.0/M output
@@ -83,6 +90,7 @@ def query_openai(client: OpenAI, prompt: str) -> dict:
     except Exception as e:
         return {"response": f"ERROR: {e}", "latency_s": 0, "tokens": 0, "cost_usd": 0.0}
 
+
 def score_response(response: str) -> int:
     """
     Simple heuristic quality score (0-10).
@@ -90,12 +98,18 @@ def score_response(response: str) -> int:
     """
     r = response.lower()
     score = 5  # base
-    if len(response) > 200: score += 1
-    if len(response) > 500: score += 1
-    if any(word in r for word in ['because', 'therefore', 'however', 'example']): score += 1
-    if response.startswith("ERROR"): score = 0
-    if len(response) < 30: score -= 2
+    if len(response) > 200:
+        score += 1
+    if len(response) > 500:
+        score += 1
+    if any(word in r for word in ["because", "therefore", "however", "example"]):
+        score += 1
+    if response.startswith("ERROR"):
+        score = 0
+    if len(response) < 30:
+        score -= 2
     return max(0, min(10, score))
+
 
 def run_analysis():
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -107,9 +121,9 @@ def run_analysis():
         openai_client = OpenAI(api_key=api_key)
 
     results = []
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Comparative LLM Analysis — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for i, prompt in enumerate(PROMPTS, 1):
         print(f"[{i:02d}/{len(PROMPTS)}] {prompt[:60]}...")
@@ -127,13 +141,13 @@ def run_analysis():
             "id": i,
             "prompt": prompt,
             "mistral": {**mistral_res, "quality": score_response(mistral_res["response"])},
-            "openai":  {**openai_res,  "quality": score_response(openai_res["response"])},
+            "openai": {**openai_res, "quality": score_response(openai_res["response"])},
         })
 
     # ── Summary table ─────────────────────────────────────
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  RESULTS SUMMARY")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     table_rows = []
     for r in results:
@@ -142,7 +156,7 @@ def run_analysis():
             r["prompt"][:45] + "…" if len(r["prompt"]) > 45 else r["prompt"],
             f"{r['mistral']['latency_s']}s",
             f"{r['mistral']['quality']}/10",
-            f"$0.00",
+            "$0.00",
             f"{r['openai']['latency_s']}s",
             f"{r['openai']['quality']}/10",
             f"${r['openai']['cost_usd']}",
@@ -151,12 +165,12 @@ def run_analysis():
     headers = ["#", "Prompt", "Mistral⏱", "Mistral★", "Mistral$", "GPT⏱", "GPT★", "GPT$"]
     print(tabulate(table_rows, headers=headers, tablefmt="rounded_outline"))
 
-    m_avg_lat  = sum(r['mistral']['latency_s'] for r in results) / len(results)
-    m_avg_qual = sum(r['mistral']['quality']   for r in results) / len(results)
+    m_avg_lat = sum(r["mistral"]["latency_s"] for r in results) / len(results)
+    m_avg_qual = sum(r["mistral"]["quality"] for r in results) / len(results)
 
-    o_avg_lat  = sum(r['openai']['latency_s']  for r in results) / len(results)
-    o_avg_qual = sum(r['openai']['quality']    for r in results) / len(results)
-    o_total_cost = sum(r['openai']['cost_usd'] for r in results)
+    o_avg_lat = sum(r["openai"]["latency_s"] for r in results) / len(results)
+    o_avg_qual = sum(r["openai"]["quality"] for r in results) / len(results)
+    o_total_cost = sum(r["openai"]["cost_usd"] for r in results)
 
     print(f"\n  Mistral  — avg latency: {m_avg_lat:.1f}s | avg quality: {m_avg_qual:.1f}/10 | total cost: $0.00 (free!)")
     print(f"  GPT      — avg latency: {o_avg_lat:.1f}s | avg quality: {o_avg_qual:.1f}/10 | total cost: ${o_total_cost:.4f}")
@@ -177,7 +191,7 @@ def run_analysis():
         "## Summary",
         "",
         f"| Metric | Mistral 7B (local) | {OPENAI_MODEL} (API) |",
-        f"|--------|-------------------|-------------------|",
+        "|--------|-------------------|-------------------|",
         f"| Avg Latency | {m_avg_lat:.1f}s | {o_avg_lat:.1f}s |",
         f"| Avg Quality Score | {m_avg_qual:.1f}/10 | {o_avg_qual:.1f}/10 |",
         f"| Total Cost (10 prompts) | $0.00 | ${o_total_cost:.4f} |",
@@ -212,6 +226,7 @@ def run_analysis():
     with open(f"comparison_report_{timestamp}.md", "w") as f:
         f.write("\n".join(md))
     print(f"  ✅ Markdown report saved  → comparison_report_{timestamp}.md\n")
+
 
 if __name__ == "__main__":
     run_analysis()
