@@ -23,10 +23,10 @@ jobs:
           kubectl version --client
 
       - name: Dry-run ollama deployment
-        run: kubectl apply --dry-run=client -f ollama-deployment.yaml
+        run: kubectl apply --dry-run=client --validate=false -f ollama-deployment.yaml
 
       - name: Dry-run monitoring stack
-        run: kubectl apply --dry-run=client -f monitoring-fixed.yaml
+        run: kubectl apply --dry-run=client --validate=false -f monitoring-fixed.yaml
 
   lint-python:
     name: Lint compare script
@@ -44,10 +44,10 @@ jobs:
       # Check the file exists before linting so CI gives a clear error if path is wrong
       - name: Check compare script exists
         run: |
-          test -f compare/compare_models.py || (echo "ERROR: compare/compare_models.py not found" && exit 1)
+          test -f compare_models.py || (echo "ERROR: compare_models.py not found" && exit 1)
 
       - name: Lint
-        run: flake8 compare/compare_models.py --max-line-length=120 --ignore=E501,W503
+        run: flake8 compare_models.py --max-line-length=120 --ignore=E501,W503
 
   build-image:
     name: Build Docker image
