@@ -1,5 +1,5 @@
 # How to Deploy an Open Source LLM on Kubernetes
-### Complete setup guide for the DrDroid Developer Advocate assignment
+
 
 ---
 
